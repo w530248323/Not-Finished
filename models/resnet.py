@@ -261,4 +261,3 @@ def resnet200(**kwargs):
     """
     model = ResNet(Bottleneck, [3, 24, 36, 3], **kwargs)
     return model
-                                                                                                                                                                                          264,1         Bot
