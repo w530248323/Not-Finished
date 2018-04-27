@@ -177,13 +177,13 @@ def generate_model(opt):
     elif opt.model == 'pseudonet':
         assert opt.model_depth in [15, 31, 63, 131, 199]
         if opt.model_depth == 15:
-            model = pseudonet.P3D63(
+            model = pseudonet.P3D15(
                 num_classes=opt.n_classes,
                 sample_height=opt.sample_height,
                 sample_width=opt.sample_width,
                 sample_duration=opt.sample_duration)
         if opt.model_depth == 31:
-            model = pseudonet.P3D63(
+            model = pseudonet.P3D31(
                 num_classes=opt.n_classes,
                 sample_height=opt.sample_height,
                 sample_width=opt.sample_width,
@@ -231,3 +231,4 @@ def generate_model(opt):
         return model, parameters
 
     return model
+
