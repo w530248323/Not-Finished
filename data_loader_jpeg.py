@@ -1,7 +1,8 @@
 import os
 import glob
 import torch.utils.data
-
+import numpy as np
+from PIL import Image
 from data_parser import JpegDataset
 from torchvision.transforms import *
 
