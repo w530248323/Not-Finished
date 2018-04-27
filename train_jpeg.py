@@ -16,22 +16,41 @@ import torch.utils.data
 from data_loader_jpeg import VideoFolder
 from generate_model import generate_model
 from callbacks import PlotLearning, MonitorLRDecay, AverageMeter
+from torch.autograd import Variable
 from torchvision.transforms import *
 from opts import parse_opts
 # from model import ConvColumn
+from visualdl import LogWriter
+import torch.onnx
 
 best_prec1 = 0
 opt = parse_opts()
+model_name = opt.model + str(opt.model_depth) \
+             + '_' + opt.resnet_shortcut \
+             + '_' + str(opt.sample_duration) \
+             + '_' + str(opt.sample_height) \
+             + '_' + str(opt.sample_width)
+
+logdir = "/workspace"
+logger = LogWriter(logdir, sync_cycle=100)
+
+# mark the components with 'train' label.
+with logger.mode("train"):
+    # create a scalar component called 'scalars/'
+    scalar_pytorch_train_loss = logger.scalar("scalars/scalar_pytorch_train_loss")
+    scalar_pytorch_train_acc = logger.scalar("scalars/scalar_pytorch_train_acc")
+    # scalar_pytorch_val_loss = logger.scalar("scalars/scalar_pytorch_val_loss")
+    # scalar_pytorch_val_acc = logger.scalar("scalars/scalar_pytorch_val_acc")
+    # image1 = logger.image("images/image1", 1)
+    # image2 = logger.image("images/image2", 1)
+    # histogram0 = logger.histogram("histogram/histogram0", num_buckets=100)
 
 
 def main():
     global best_prec1
-
     # set run output folder
-    print("=> Output folder for this run -- {}".format(opt.model) + str(opt.model_depth))
-    save_dir = os.path.join(opt.output_dir, opt.model + str(opt.model_depth) + '_' +
-                            str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
-                            str(opt.sample_height) + '_' + str(opt.sample_width))
+    print("=> Output folder for this run -- {}".format(model_name))
+    save_dir = os.path.join(opt.output_dir, model_name)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         os.makedirs(os.path.join(save_dir, 'plots'))
@@ -54,6 +73,9 @@ def main():
 
     # create model
     model = generate_model(opt)
+
+    dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width))
+    torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
 
     # optionally resume from a checkpoint
     if opt.resume:
@@ -190,6 +212,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
+    train_step = 0
     # switch to train mode
     model.train()
 
@@ -219,6 +242,13 @@ def train(train_loader, model, criterion, optimizer, epoch):
         loss.backward()
         optimizer.step()
 
+        # use VisualDL to retrieve metrics
+        # scalar
+        scalar_pytorch_train_loss.add_record(train_step, float(loss))
+        scalar_pytorch_train_acc.add_record(train_step, float(prec1))
+
+        train_step += 1
+
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
@@ -230,7 +260,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                   'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
-                         data_time=data_time, loss=losses, top1=top1, top5=top5))
+                                                                  data_time=data_time, loss=losses, top1=top1,
+                                                                  top5=top5))
     return losses.avg, top1.avg, top5.avg
 
 
@@ -294,21 +325,17 @@ def save_results(logits_matrix, targets_list, class_to_idx):
     print("Saving inference results ...")
     path_to_save = os.path.join(
         opt.output_dir, opt.model + str(opt.model_depth) + '_' +
-                            str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
-                            str(opt.sample_height) + '_' + str(opt.sample_width), "test_results.pkl")
+                        str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
+                        str(opt.sample_height) + '_' + str(opt.sample_width), "test_results.pkl")
     with open(path_to_save, "wb") as f:
         pickle.dump([logits_matrix, targets_list, class_to_idx], f)
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth'):
     checkpoint_path = os.path.join(
-        opt.output_dir, opt.model + str(opt.model_depth) + '_' +
-                            str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
-                            str(opt.sample_height) + '_' + str(opt.sample_width), filename)
+        opt.output_dir, model_name, filename)
     model_path = os.path.join(
-        opt.output_dir, opt.model + str(opt.model_depth) + '_' +
-                            str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
-                            str(opt.sample_height) + '_' + str(opt.sample_width), 'model_best.pth')
+        opt.output_dir, model_name, 'model_best.pth')
     torch.save(state, checkpoint_path)
 
     if is_best:
