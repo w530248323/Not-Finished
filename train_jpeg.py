@@ -51,11 +51,7 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     # create model
-    # model = ConvColumn(config['num_classes'])
     model = generate_model(opt)
-
-    # multi GPU setting
-    # model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
     # optionally resume from a checkpoint
     if opt.resume:
@@ -71,7 +67,6 @@ def main():
             print("=> no checkpoint found at '{}'".format(
                 opt.checkpoint))
 
-    # ###################################修改###################################### #
     # find best cudnn configuration
     cudnn.benchmark = True
 
@@ -193,7 +188,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-    # ###################################修改###################################### #
     # switch to train mode
     model.train()
 
