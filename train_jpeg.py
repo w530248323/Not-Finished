@@ -29,7 +29,9 @@ def main():
 
     # set run output folder
     print("=> Output folder for this run -- {}".format(opt.model) + str(opt.model_depth))
-    save_dir = os.path.join(opt.output_dir, opt.model + str(opt.model_depth))
+    save_dir = os.path.join(opt.output_dir, opt.model + str(opt.model_depth) + '_' +
+                            str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
+                            str(opt.sample_height) + '_' + str(opt.sample_width))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         os.makedirs(os.path.join(save_dir, 'plots'))
