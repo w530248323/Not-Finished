@@ -26,9 +26,9 @@ def parse_opts():
                         help='batch size')
     parser.add_argument('--sample_duration', '-d', default=36, type=int,
                         help='Temporal duration of inputs')
-    parser.add_argument('--sample_height', '-sh', default=100, type=int,
+    parser.add_argument('--sample_height', '-sh', default=96, type=int,
                         help='Height of inputs')
-    parser.add_argument('--sample_width', '-sw', default=132, type=int,
+    parser.add_argument('--sample_width', '-sw', default=170, type=int,
                         help='Width of inputs')
     parser.add_argument('--nclips', default=1,
                         help='')
@@ -37,7 +37,7 @@ def parse_opts():
 
     parser.add_argument('--momentum', default=0.9,
                         help='Momentum')
-    parser.add_argument('--lr', '-l', default=0.00005, type=float,
+    parser.add_argument('--lr', '-l', default=0.0005, type=float,
                         help='Initial learning rate')
     parser.add_argument('--last_lr', default=0.000001,
                         help='last learning rate')
