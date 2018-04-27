@@ -73,7 +73,7 @@ def main():
     cudnn.benchmark = True
 
     transform = Compose([
-        CenterCrop((96, 160)),
+        CenterCrop((96, 170)),
         ToTensor(),
         Normalize(mean=[0.485, 0.456, 0.406],
                   std=[0.229, 0.224, 0.225])
