@@ -100,6 +100,7 @@ class Bottleneck(nn.Module):
         if self.downsample is not None:
             residual = self.downsample(x)
 
+
         out += residual
         out = self.relu(out)
 
@@ -111,12 +112,14 @@ class ResNet(nn.Module):
     def __init__(self,
                  block,
                  layers,
-                 sample_size,
+                 sample_height,
+                 sample_width,
                  sample_duration,
                  shortcut_type='B',
                  num_classes=400):
         self.inplanes = 64
         super(ResNet, self).__init__()
+        # ######################################
         self.conv1 = nn.Conv3d(
             3,
             64,
@@ -135,9 +138,10 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(
             block, 512, layers[3], shortcut_type, stride=2)
         last_duration = int(math.ceil(sample_duration / 16))
-        last_size = int(math.ceil(sample_size / 32))
+        last_size_width = int(math.ceil(sample_width / 32))
+        last_size_height = int(math.ceil(sample_height / 32))
         self.avgpool = nn.AvgPool3d(
-            (last_duration, last_size, last_size), stride=1)
+            (last_duration, last_size_height, last_size_width), stride=1)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -259,3 +263,4 @@ def resnet200(**kwargs):
     """
     model = ResNet(Bottleneck, [3, 24, 36, 3], **kwargs)
     return model
+                                                                                                                                                                                          264,1         Bot
