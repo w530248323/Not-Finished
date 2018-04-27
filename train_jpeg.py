@@ -6,6 +6,7 @@ import glob
 import signal
 import pickle
 
+import numpy as np
 import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
@@ -70,11 +71,12 @@ def main():
             print("=> no checkpoint found at '{}'".format(
                 opt.checkpoint))
 
+    # ###################################修改###################################### #
     # find best cudnn configuration
-    cudnn.benchmark = False
+    cudnn.benchmark = True
 
     transform = Compose([
-        CenterCrop(84),
+        CenterCrop((96, 160)),
         ToTensor(),
         Normalize(mean=[0.485, 0.456, 0.406],
                   std=[0.229, 0.224, 0.225])
@@ -112,7 +114,7 @@ def main():
         val_data,
         batch_size=opt.batch_size, shuffle=False,
         num_workers=opt.num_workers, pin_memory=True,
-        drop_last=False)
+        drop_last=True)
 
     assert len(train_data.classes) == opt.n_classes
 
@@ -191,7 +193,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-
+    # ###################################修改###################################### #
     # switch to train mode
     model.train()
 
