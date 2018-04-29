@@ -324,9 +324,7 @@ def validate(val_loader, model, criterion, class_to_idx=None):
 def save_results(logits_matrix, targets_list, class_to_idx):
     print("Saving inference results ...")
     path_to_save = os.path.join(
-        opt.output_dir, opt.model + str(opt.model_depth) + '_' +
-                        str(opt.resnet_shortcut) + '_' + str(opt.sample_duration) + '_' +
-                        str(opt.sample_height) + '_' + str(opt.sample_width), "test_results.pkl")
+        opt.output_dir, model_name, "test_results.pkl")
     with open(path_to_save, "wb") as f:
         pickle.dump([logits_matrix, targets_list, class_to_idx], f)
 
