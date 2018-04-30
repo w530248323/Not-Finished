@@ -31,7 +31,7 @@ model_name = opt.model + str(opt.model_depth) \
              + '_' + str(opt.sample_height) \
              + '_' + str(opt.sample_width)
 
-logdir = "/workspace"
+logdir = "./workspace"
 logger = LogWriter(logdir, sync_cycle=100)
 
 # mark the components with 'train' label.
@@ -74,8 +74,8 @@ def main():
     # create model
     model = generate_model(opt)
 
-    dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width))
-    torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
+    # dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width))
+    # torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
 
     # optionally resume from a checkpoint
     if opt.resume:
