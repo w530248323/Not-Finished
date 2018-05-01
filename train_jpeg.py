@@ -19,7 +19,6 @@ from callbacks import MonitorLRDecay, AverageMeter, save_images_for_debug
 from torch.autograd import Variable
 from torchvision.transforms import *
 from opts import parse_opts
-# from model import ConvColumn
 from visualdl import LogWriter
 import torch.onnx
 
@@ -155,7 +154,7 @@ def main():
         return
 
     # set callbacks
-    lr_decayer = MonitorLRDecay(0.6, 3)
+    lr_decayer = MonitorLRDecay(0.6, 1)
     val_loss = 9999999
 
     # set end condition by num epochs
@@ -166,9 +165,6 @@ def main():
     print(" > Training is getting started...")
     print(" > Training takes {} epochs.".format(num_epochs))
     start_epoch = opt.start_epoch if opt.resume else 0
-    
-    train_step = 0
-    val_step = 0
 
     for epoch in range(start_epoch, num_epochs):
         lr = lr_decayer(val_loss, lr)
@@ -182,13 +178,13 @@ def main():
         # train for one epoch
         start_time_epoch = time.time()
         train_loss, train_top1, train_top5 = train(
-            train_loader, model, criterion, optimizer, epoch, train_step)
+            train_loader, model, criterion, optimizer, epoch)
         print(" > Time taken for this 1 train epoch = {}".
               format(time.time() - start_time_epoch))
 
         # evaluate on validation set
         start_time_epoch = time.time()
-        val_loss, val_top1, val_top5 = validate(val_loader, model, criterion, val_step)
+        val_loss, val_top1, val_top5 = validate(val_loader, model, criterion)
         print(" > Time taken for this 1 validation epoch = {}".
               format(time.time() - start_time_epoch))
 
@@ -203,18 +199,18 @@ def main():
         }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, epoch, train_step):
+def train(train_loader, model, criterion, optimizer, epoch):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
+    train_step = 0
     # switch to train mode
     model.train()
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
-
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -261,12 +257,11 @@ def train(train_loader, model, criterion, optimizer, epoch, train_step):
     return losses.avg, top1.avg, top5.avg
 
 
-def validate(val_loader, model, criterion, val_step):
+def validate(val_loader, model, criterion, class_to_idx=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-    class_to_idx=None
 
     # switch to evaluate mode
     model.eval()
@@ -293,11 +288,6 @@ def validate(val_loader, model, criterion, val_step):
         losses.update(loss.data[0], input.size(0))
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
-        
-        scalar_val_loss.add_record(val_step, float(loss))
-        scalar_val_acc.add_record(val_step, float(prec1))
-        
-        val_step += 1
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -340,12 +330,6 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth'):
 
     if is_best:
         shutil.copyfile(checkpoint_path, model_path)
-
-
-def adjust_learning_rate(optimizer, lr):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
 
 
 def accuracy(output, target, topk=(1,)):
