@@ -289,8 +289,8 @@ def validate(val_loader, model, criterion, val_step, class_to_idx=None):
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
 
-        scalar_train_loss.add_record(val_step, float(loss))
-        scalar_train_acc.add_record(val_step, float(prec1))
+        scalar_val_loss.add_record(val_step, float(loss))
+        scalar_val_acc.add_record(val_step, float(prec1))
 
         val_step += 1
 
