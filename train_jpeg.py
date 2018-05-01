@@ -71,8 +71,8 @@ def main():
     # create model
     model = generate_model(opt)
 
-    # dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width))
-    # torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
+    dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width)).cuda()
+    torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
 
     # optionally resume from a checkpoint
     if opt.resume:
