@@ -31,19 +31,16 @@ model_name = opt.model + str(opt.model_depth) \
              + '_' + str(opt.sample_height) \
              + '_' + str(opt.sample_width)
 
-logdir = "./workspace"
+logdir = "./workspace/{}".format(model_name)
 logger = LogWriter(logdir, sync_cycle=100)
 
 # mark the components with 'train' label.
 with logger.mode("train"):
     # create a scalar component called 'scalars/'
-    scalar_pytorch_train_loss = logger.scalar("scalars/scalar_pytorch_train_loss")
-    scalar_pytorch_train_acc = logger.scalar("scalars/scalar_pytorch_train_acc")
-    # scalar_pytorch_val_loss = logger.scalar("scalars/scalar_pytorch_val_loss")
-    # scalar_pytorch_val_acc = logger.scalar("scalars/scalar_pytorch_val_acc")
-    # image1 = logger.image("images/image1", 1)
-    # image2 = logger.image("images/image2", 1)
-    # histogram0 = logger.histogram("histogram/histogram0", num_buckets=100)
+    scalar_train_loss = logger.scalar("scalars/scalar_train_loss")
+    scalar_train_acc = logger.scalar("scalars/scalar_train_acc")
+    scalar_val_loss = logger.scalar("scalars/scalar_val_loss")
+    scalar_val_acc = logger.scalar("scalars/scalar_val_acc")
 
 
 def main():
@@ -137,7 +134,7 @@ def main():
 
     assert len(train_data.classes) == opt.n_classes
 
-    # define loss function (criterion) and pptimizer
+    # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
 
     # define optimizer
@@ -167,6 +164,9 @@ def main():
     print(" > Training is getting started...")
     print(" > Training takes {} epochs.".format(num_epochs))
     start_epoch = opt.start_epoch if opt.resume else 0
+    
+    train_step = 0
+    val_step = 0
 
     for epoch in range(start_epoch, num_epochs):
         lr = lr_decayer(val_loss, lr)
@@ -180,13 +180,13 @@ def main():
         # train for one epoch
         start_time_epoch = time.time()
         train_loss, train_top1, train_top5 = train(
-            train_loader, model, criterion, optimizer, epoch)
+            train_loader, model, criterion, optimizer, epoch, train_step)
         print(" > Time taken for this 1 train epoch = {}".
               format(time.time() - start_time_epoch))
 
         # evaluate on validation set
         start_time_epoch = time.time()
-        val_loss, val_top1, val_top5 = validate(val_loader, model, criterion)
+        val_loss, val_top1, val_top5 = validate(val_loader, model, criterion, val_step)
         print(" > Time taken for this 1 validation epoch = {}".
               format(time.time() - start_time_epoch))
 
@@ -206,13 +206,12 @@ def main():
         }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, train_step):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-    train_step = 0
     # switch to train mode
     model.train()
 
@@ -244,8 +243,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         # use VisualDL to retrieve metrics
         # scalar
-        scalar_pytorch_train_loss.add_record(train_step, float(loss))
-        scalar_pytorch_train_acc.add_record(train_step, float(prec1))
+        scalar_train_loss.add_record(train_step, float(loss))
+        scalar_train_acc.add_record(train_step, float(prec1))
 
         train_step += 1
 
@@ -265,11 +264,12 @@ def train(train_loader, model, criterion, optimizer, epoch):
     return losses.avg, top1.avg, top5.avg
 
 
-def validate(val_loader, model, criterion, class_to_idx=None):
+def validate(val_loader, model, criterion, val_step):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
+    class_to_idx=None
 
     # switch to evaluate mode
     model.eval()
@@ -296,6 +296,11 @@ def validate(val_loader, model, criterion, class_to_idx=None):
         losses.update(loss.data[0], input.size(0))
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
+        
+        scalar_val_loss.add_record(val_step, float(loss))
+        scalar_val_acc.add_record(val_step, float(prec1))
+        
+        val_step += 1
 
         # measure elapsed time
         batch_time.update(time.time() - end)
