@@ -19,8 +19,6 @@ from callbacks import MonitorLRDecay, AverageMeter, save_images_for_debug
 from torch.autograd import Variable
 from torchvision.transforms import *
 from opts import parse_opts
-from visualdl import LogWriter
-import torch.onnx
 
 best_prec1 = 0
 opt = parse_opts()
@@ -30,17 +28,6 @@ model_name = opt.model + str(opt.model_depth) \
              + '_' + str(opt.sample_height) \
              + '_' + str(opt.sample_width)
 
-logdir = "./workspace/{}".format(model_name)
-logger = LogWriter(logdir, sync_cycle=100)
-
-# mark the components with 'train' label.
-with logger.mode("train"):
-    # create a scalar component called 'scalars/'
-    scalar_train_loss = logger.scalar("scalars/scalar_train_loss")
-    scalar_train_acc = logger.scalar("scalars/scalar_train_acc")
-    scalar_val_loss = logger.scalar("scalars/scalar_val_loss")
-    scalar_val_acc = logger.scalar("scalars/scalar_val_acc")
-
 
 def main():
     global best_prec1
@@ -49,7 +36,6 @@ def main():
     save_dir = os.path.join(opt.output_dir, model_name)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-        os.makedirs(os.path.join(save_dir, 'plots'))
 
     # adds a handler for Ctrl+C
     def signal_handler():
@@ -69,9 +55,6 @@ def main():
 
     # create model
     model = generate_model(opt)
-
-    dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width)).cuda()
-    torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
 
     # optionally resume from a checkpoint
     if opt.resume:
@@ -205,7 +188,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-    train_step = 0
     # switch to train mode
     model.train()
 
@@ -233,14 +215,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        # use VisualDL to retrieve metrics
-        # scalar
-        scalar_train_loss.add_record(train_step, float(loss))
-        scalar_train_acc.add_record(train_step, float(prec1))
-
-        train_step += 1
-
+        
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
