@@ -110,6 +110,10 @@ def main():
 
     print(" > Using {} processes for data loader.".format(
         opt.num_workers))
+    
+    data_item, target_idx = train_data[0]
+    save_images_for_debug("input_images", data_item.unsqueeze(0))
+    
     train_loader = torch.utils.data.DataLoader(
         train_data,
         batch_size=opt.batch_size, shuffle=True,
@@ -151,8 +155,6 @@ def main():
         return
 
     # set callbacks
-    plotter = PlotLearning(os.path.join(
-        save_dir, "plots"), opt.n_classes)
     lr_decayer = MonitorLRDecay(0.6, 3)
     val_loss = 9999999
 
@@ -189,11 +191,6 @@ def main():
         val_loss, val_top1, val_top5 = validate(val_loader, model, criterion, val_step)
         print(" > Time taken for this 1 validation epoch = {}".
               format(time.time() - start_time_epoch))
-
-        # plot learning
-        plotter_dict = {'loss': train_loss, 'val_loss': val_loss, 'acc': train_top1, 'val_acc': val_top1,
-                        'learning_rate': lr}
-        plotter.plot(plotter_dict)
 
         # remember best prec@1 and save checkpoint
         is_best = val_top1 > best_prec1
