@@ -15,7 +15,7 @@ import torch.utils.data
 
 from data_loader_jpeg import VideoFolder
 from generate_model import generate_model
-from callbacks import PlotLearning, MonitorLRDecay, AverageMeter
+from callbacks import MonitorLRDecay, AverageMeter, save_images_for_debug
 from torch.autograd import Variable
 from torchvision.transforms import *
 from opts import parse_opts
