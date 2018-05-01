@@ -47,7 +47,6 @@ def main():
     save_dir = os.path.join(opt.output_dir, model_name)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-        os.makedirs(os.path.join(save_dir, 'plots'))
 
     # adds a handler for Ctrl+C
     def signal_handler():
