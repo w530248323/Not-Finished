@@ -38,6 +38,8 @@ with logger.mode("train"):
     # create a scalar component called 'scalars/'
     scalar_train_loss = logger.scalar("scalars/scalar_train_loss")
     scalar_train_acc = logger.scalar("scalars/scalar_train_acc")
+    scalar_val_loss = logger.scalar("scalars/scalar_val_loss")
+    scalar_val_acc = logger.scalar("scalars/scalar_val_acc")
 
 
 def main():
@@ -106,10 +108,10 @@ def main():
 
     print(" > Using {} processes for data loader.".format(
         opt.num_workers))
-    
+
     data_item, target_idx = train_data[0]
     save_images_for_debug("input_images", data_item.unsqueeze(0))
-    
+
     train_loader = torch.utils.data.DataLoader(
         train_data,
         batch_size=opt.batch_size, shuffle=True,
@@ -162,6 +164,8 @@ def main():
     print(" > Training is getting started...")
     print(" > Training takes {} epochs.".format(num_epochs))
     start_epoch = opt.start_epoch if opt.resume else 0
+    train_step = 0
+    val_step = 0
 
     for epoch in range(start_epoch, num_epochs):
         lr = lr_decayer(val_loss, lr)
@@ -174,14 +178,14 @@ def main():
 
         # train for one epoch
         start_time_epoch = time.time()
-        train_loss, train_top1, train_top5 = train(
-            train_loader, model, criterion, optimizer, epoch)
+        train_loss, train_top1, train_top5, train_step = train(
+            train_loader, model, criterion, optimizer, epoch, train_step)
         print(" > Time taken for this 1 train epoch = {}".
               format(time.time() - start_time_epoch))
 
         # evaluate on validation set
         start_time_epoch = time.time()
-        val_loss, val_top1, val_top5 = validate(val_loader, model, criterion)
+        val_loss, val_top1, val_top5, val_step = validate(val_loader, model, criterion, val_step)
         print(" > Time taken for this 1 validation epoch = {}".
               format(time.time() - start_time_epoch))
 
@@ -196,13 +200,12 @@ def main():
         }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, train_step):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
-    train_step = 0
     # switch to train mode
     model.train()
 
@@ -251,10 +254,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
                                                                   data_time=data_time, loss=losses, top1=top1,
                                                                   top5=top5))
-    return losses.avg, top1.avg, top5.avg
+    return losses.avg, top1.avg, top5.avg, train_step
 
 
-def validate(val_loader, model, criterion, class_to_idx=None):
+def validate(val_loader, model, criterion, val_step, class_to_idx=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -286,6 +289,11 @@ def validate(val_loader, model, criterion, class_to_idx=None):
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
 
+        scalar_train_loss.add_record(val_step, float(loss))
+        scalar_train_acc.add_record(val_step, float(prec1))
+
+        val_step += 1
+
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
@@ -307,7 +315,7 @@ def validate(val_loader, model, criterion, class_to_idx=None):
         # youtube_ids_list = np.asarray(youtube_ids_list)
         # print(logits_matrix.shape, targets_list.shape, youtube_ids_list.shape)
         save_results(logits_matrix, targets_list, class_to_idx)
-    return losses.avg, top1.avg, top5.avg
+    return losses.avg, top1.avg, top5.avg, val_step
 
 
 def save_results(logits_matrix, targets_list, class_to_idx):
