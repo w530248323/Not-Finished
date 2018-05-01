@@ -1,12 +1,12 @@
 import torch
 from torch import nn
-from models import resnet, pre_act_resnet, wide_resnet, resnext, densenet, pseudonet
+from models import resnet, pre_act_resnet, wide_resnet, resnext, densenet, pseudonet, c3d
 
 
 def generate_model(opt):
 
     global model
-    assert opt.model in ['resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet', 'pseudonet']
+    assert opt.model in ['resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet', 'pseudonet', 'c3d']
 
     if opt.model == 'resnet':
         assert opt.model_depth in [10, 18, 34, 50, 101, 152, 200]
@@ -206,6 +206,9 @@ def generate_model(opt):
                 sample_height=opt.sample_height,
                 sample_width=opt.sample_width,
                 sample_duration=opt.sample_duration)
+    
+    elif opt.model == 'c3d':
+        model = c3d.c3d(num_classes=opt.n_classes)
 
     # gpus = [int(i) for i in opt.gpus.split(',')]
     # model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
