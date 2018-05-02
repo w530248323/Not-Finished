@@ -5,9 +5,9 @@ def parse_opts():
     parser = argparse.ArgumentParser(
         description='Jester Training based on PyTorch ')
 
-    parser.add_argument('--train_data_folder', default='/home/wangjy/Documents/jester/gesture data/20bn-jester-v1',
+    parser.add_argument('--train_data_folder', default='/home/wangjy/Documents/jester/gesture_data/20bn-jester-v1',
                         help='train data folder path')
-    parser.add_argument('--val_data_folder', default='/home/wangjy/Documents/jester/gesture data/20bn-jester-v1',
+    parser.add_argument('--val_data_folder', default='/home/wangjy/Documents/jester/gesture_data/20bn-jester-v1',
                         help='validate data folder path')
     parser.add_argument('--train_labels', default='labels/v1-train.csv',
                         help='train labels file path')
