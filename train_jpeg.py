@@ -13,7 +13,7 @@ import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 
-from data_loader_gulp import VideoFolder
+from data_loader_jpeg import VideoFolder
 from generate_model import generate_model
 from callbacks import MonitorLRDecay, AverageMeter, save_images_for_debug
 from torch.autograd import Variable
