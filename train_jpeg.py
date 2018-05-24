@@ -12,43 +12,34 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
+import visdom
 
 from data_loader_jpeg import VideoFolder
 from generate_model import generate_model
-from callbacks import MonitorLRDecay, AverageMeter, save_images_for_debug
-from torch.autograd import Variable
+from callbacks import PlotLearning, MonitorLRDecay, AverageMeter
 from torchvision.transforms import *
 from opts import parse_opts
-from visualdl import LogWriter
-# import torch.onnx
+# from model import ConvColumn
 
 best_prec1 = 0
 opt = parse_opts()
-model_name = opt.model + str(opt.model_depth) \
-             + '_' + opt.resnet_shortcut \
-             + '_' + str(opt.sample_duration) \
-             + '_' + str(opt.sample_height) \
-             + '_' + str(opt.sample_width)
 
-logdir = "./workspace/{}".format(model_name)
-logger = LogWriter(logdir, sync_cycle=100)
-
-# mark the components with 'train' label.
-with logger.mode("train"):
-    # create a scalar component called 'scalars/'
-    scalar_train_loss = logger.scalar("scalars/scalar_train_loss")
-    scalar_train_acc = logger.scalar("scalars/scalar_train_acc")
-    scalar_val_loss = logger.scalar("scalars/scalar_val_loss")
-    scalar_val_acc = logger.scalar("scalars/scalar_val_acc")
-
+# viz = visdom.Visdom()
+# colors = np.random.randint(0, 255, (4, 3))
+# train_loss = viz.line(Y=np.linspace(0, 3, 1))
+# train_acc = viz.line(Y=np.linspace(0, 1.3, 1))
+# val_loss = viz.line(Y=np.linspace(0, 3, 1))
+# val_acc = viz.line(Y=np.linspace(0, 1.3, 1))
 
 def main():
     global best_prec1
+
     # set run output folder
-    print("=> Output folder for this run -- {}".format(model_name))
-    save_dir = os.path.join(opt.output_dir, model_name)
+    print("=> Output folder for this run -- {}".format(opt.model) + str(opt.model_depth))
+    save_dir = os.path.join(opt.output_dir, opt.model + str(opt.model_depth))
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
+        os.makedirs(os.path.join(save_dir, 'plots'))
 
     # adds a handler for Ctrl+C
     def signal_handler():
@@ -67,10 +58,11 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     # create model
+    # model = ConvColumn(config['num_classes'])
     model = generate_model(opt)
 
-    # dummy_input = Variable(torch.randn(opt.batch_size, 3, opt.sample_duration, opt.sample_height, opt.sample_width)).cuda()
-    # torch.onnx.export(model, dummy_input, "{}.onnx".format(model_name))
+    # multi GPU setting
+    # model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
     # optionally resume from a checkpoint
     if opt.resume:
@@ -85,12 +77,13 @@ def main():
         else:
             print("=> no checkpoint found at '{}'".format(
                 opt.checkpoint))
-
+    
+    # ###################################修改###################################### #
     # find best cudnn configuration
     cudnn.benchmark = True
 
     transform = Compose([
-        CenterCrop((96, 170)),
+        CenterCrop(84),
         ToTensor(),
         Normalize(mean=[0.485, 0.456, 0.406],
                   std=[0.229, 0.224, 0.225])
@@ -108,10 +101,6 @@ def main():
 
     print(" > Using {} processes for data loader.".format(
         opt.num_workers))
-
-    data_item, target_idx = train_data[0]
-    save_images_for_debug("input_images", data_item.unsqueeze(0))
-
     train_loader = torch.utils.data.DataLoader(
         train_data,
         batch_size=opt.batch_size, shuffle=True,
@@ -136,7 +125,7 @@ def main():
 
     assert len(train_data.classes) == opt.n_classes
 
-    # define loss function (criterion) and optimizer
+    # define loss function (criterion) and pptimizer
     criterion = nn.CrossEntropyLoss().cuda()
 
     # define optimizer
@@ -153,7 +142,9 @@ def main():
         return
 
     # set callbacks
-    lr_decayer = MonitorLRDecay(0.6, 1)
+    plotter = PlotLearning(os.path.join(
+        save_dir, "plots"), opt.n_classes)
+    lr_decayer = MonitorLRDecay(0.6, 3)
     val_loss = 9999999
 
     # set end condition by num epochs
@@ -164,8 +155,6 @@ def main():
     print(" > Training is getting started...")
     print(" > Training takes {} epochs.".format(num_epochs))
     start_epoch = opt.start_epoch if opt.resume else 0
-    train_step = 0
-    val_step = 0
 
     for epoch in range(start_epoch, num_epochs):
         lr = lr_decayer(val_loss, lr)
@@ -178,16 +167,21 @@ def main():
 
         # train for one epoch
         start_time_epoch = time.time()
-        train_loss, train_top1, train_top5, train_step = train(
-            train_loader, model, criterion, optimizer, epoch, train_step)
+        train_loss, train_top1, train_top5 = train(
+            train_loader, model, criterion, optimizer, epoch)
         print(" > Time taken for this 1 train epoch = {}".
               format(time.time() - start_time_epoch))
 
         # evaluate on validation set
         start_time_epoch = time.time()
-        val_loss, val_top1, val_top5, val_step = validate(val_loader, model, criterion, val_step)
+        val_loss, val_top1, val_top5 = validate(val_loader, model, criterion)
         print(" > Time taken for this 1 validation epoch = {}".
               format(time.time() - start_time_epoch))
+
+        # plot learning
+        plotter_dict = {'loss': train_loss, 'val_loss': val_loss, 'acc': train_top1, 'val_acc': val_top1,
+                        'learning_rate': lr}
+        plotter.plot(plotter_dict)
 
         # remember best prec@1 and save checkpoint
         is_best = val_top1 > best_prec1
@@ -200,17 +194,19 @@ def main():
         }, is_best)
 
 
-def train(train_loader, model, criterion, optimizer, epoch, train_step):
+def train(train_loader, model, criterion, optimizer, epoch):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
+    # ###################################修改###################################### #
     # switch to train mode
     model.train()
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
+
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -234,13 +230,6 @@ def train(train_loader, model, criterion, optimizer, epoch, train_step):
         loss.backward()
         optimizer.step()
 
-        # use VisualDL to retrieve metrics
-        # scalar
-        scalar_train_loss.add_record(train_step, float(loss))
-        scalar_train_acc.add_record(train_step, float(prec1))
-
-        train_step += 1
-
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
@@ -252,12 +241,14 @@ def train(train_loader, model, criterion, optimizer, epoch, train_step):
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                   'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
-                                                                  data_time=data_time, loss=losses, top1=top1,
-                                                                  top5=top5))
-    return losses.avg, top1.avg, top5.avg, train_step
+                         data_time=data_time, loss=losses, top1=top1, top5=top5))
+            # viz.line(X=np.array((i)), Y=np.array((loss)), win=train_loss, update='append')
+            # viz.line(X=np.array((i)), Y=np.array((top1)), win=train_acc, update='append')
+
+    return losses.avg, top1.avg, top5.avg
 
 
-def validate(val_loader, model, criterion, val_step, class_to_idx=None):
+def validate(val_loader, model, criterion, class_to_idx=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -289,11 +280,6 @@ def validate(val_loader, model, criterion, val_step, class_to_idx=None):
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
 
-        scalar_val_loss.add_record(val_step, float(loss))
-        scalar_val_acc.add_record(val_step, float(prec1))
-
-        val_step += 1
-
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
@@ -305,6 +291,8 @@ def validate(val_loader, model, criterion, val_step, class_to_idx=None):
                   'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                     i, len(val_loader), batch_time=batch_time, loss=losses, top1=top1, top5=top5))
+	    # viz.line(X=np.array((i,)), Y=np.array((loss.avg,)), win=val_loss, update='append')
+            # viz.line(X=np.array((i,)), Y=np.array((top1.avg,)), win=val_acc, update='append')
 
     print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
           .format(top1=top1, top5=top5))
@@ -315,26 +303,32 @@ def validate(val_loader, model, criterion, val_step, class_to_idx=None):
         # youtube_ids_list = np.asarray(youtube_ids_list)
         # print(logits_matrix.shape, targets_list.shape, youtube_ids_list.shape)
         save_results(logits_matrix, targets_list, class_to_idx)
-    return losses.avg, top1.avg, top5.avg, val_step
+    return losses.avg, top1.avg, top5.avg
 
 
 def save_results(logits_matrix, targets_list, class_to_idx):
     print("Saving inference results ...")
     path_to_save = os.path.join(
-        opt.output_dir, model_name, "test_results.pkl")
+        opt.output_dir, opt.model + str(opt.model_depth), "test_results.pkl")
     with open(path_to_save, "wb") as f:
         pickle.dump([logits_matrix, targets_list, class_to_idx], f)
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth'):
     checkpoint_path = os.path.join(
-        opt.output_dir, model_name, filename)
+        opt.output_dir, opt.model + str(opt.model_depth), filename)
     model_path = os.path.join(
-        opt.output_dir, model_name, 'model_best.pth')
+        opt.output_dir, opt.model + str(opt.model_depth), 'model_best.pth')
     torch.save(state, checkpoint_path)
 
     if is_best:
         shutil.copyfile(checkpoint_path, model_path)
+
+
+def adjust_learning_rate(optimizer, lr):
+    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
 
 def accuracy(output, target, topk=(1,)):
